@@ -1,4 +1,4 @@
-import { AgentContext, AgentResult } from "./types";
+import { AgentContext } from "./types";
 import { ContextAgent } from "./ContextAgent";
 import { DraftAgent } from "./DraftAgent";
 import { ActionAgent } from "./ActionAgent";
@@ -15,34 +15,47 @@ export class Orchestrator {
    * Coordinates Context retrieval and Draft generation.
    */
   async handleIncomingMessage(context: AgentContext): Promise<void> {
-    console.log(`[Orchestrator] Processing message for user ${context.userId}`);
+    console.log(
+      `[Orchestrator] Processing message for user ${context.userId}`
+    );
 
     // 1. Build Context
     const contextResult = await this.contextAgent.buildContext(context);
-    if (!contextResult.success) {
+
+    if (!contextResult.success || !contextResult.data) {
       await this.messagingProvider.sendMessage({
         recipientId: context.userId,
-        text: "I'm having trouble accessing my memory right now."
+        text: "I'm having trouble accessing my memory right now.",
       });
+
       return;
     }
 
-    // 2. Draft Response or Recommendation
-    const draftResult = await this.draftAgent.generateDraft(context, contextResult.data.summary);
-    if (!draftResult.success) {
-      await this.messagingProvider.sendMessage({
-        recipientId: context.userId,
-        text: "I encountered an error while formulating a response."
-      });
-      return;
-    }
-
-    // 3. Send the drafted response back to the user via Linq
-    await this.messagingProvider.sendMessage({
-      recipientId: context.userId,
-      text: draftResult.data.draft
+    // 2. Generate Response
+    // DraftAgent receives the context + retrieved memory summary.
+    const draftResult = await this.draftAgent.generateDraft({
+      intent: "reply",
+      userQuery: context.input,
+      context: contextResult.data
     });
 
-    console.log(`[Orchestrator] Finished processing message for user ${context.userId}`);
+    if (!draftResult.success || !draftResult.data) {
+      await this.messagingProvider.sendMessage({
+        recipientId: context.userId,
+        text: "I couldn't generate a response right now.",
+      });
+
+      return;
+    }
+
+    // 3. Send response through Linq
+    await this.messagingProvider.sendMessage({
+      recipientId: context.userId,
+      text: draftResult.data.draft,
+    });
+
+    console.log(
+      `[Orchestrator] Finished processing message for user ${context.userId}`
+    );
   }
 }

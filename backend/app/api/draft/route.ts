@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { DraftAgent, DraftAgentInput } from '../../../../agents/DraftAgent';
+import { DraftAgent, DraftAgentInput } from '../../../agents/DraftAgent';
 
 const draftAgent = new DraftAgent();
 
