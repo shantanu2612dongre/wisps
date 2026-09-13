@@ -4,8 +4,8 @@ import OpenAI from "openai";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" });
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || "",
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ""
+  process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
+  process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy-key"
 );
 
 export class GmailRepository {
