@@ -36,15 +36,24 @@ export class LinqProvider implements MessagingProvider {
 
   async sendMessage(message: OutgoingMessage): Promise<boolean> {
     try {
-      const response = await fetch(this.endpoint, {
+      const url = `${this.endpoint.replace(/\/$/, '')}/api/partner/v3/chats`;
+      const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          to: message.recipientId,
-          text: message.text,
+          from: process.env.LINQ_PHONE_NUMBER,
+          to: [message.recipientId],
+          message: {
+            parts: [
+              {
+                type: "text",
+                value: message.text,
+              }
+            ]
+          }
         }),
       });
 
