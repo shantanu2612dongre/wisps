@@ -1,7 +1,7 @@
 import { AgentContext, AgentResult, MemoryFact } from "./types";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" });
 
 export class MemoryAgent {
   /**
