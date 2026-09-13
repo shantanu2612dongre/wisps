@@ -3,6 +3,12 @@ import { ContextAgent } from "./ContextAgent";
 import { DraftAgent } from "./DraftAgent";
 import { ActionAgent } from "./ActionAgent";
 import { LinqProvider } from "../messaging/linq/LinqProvider";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export class Orchestrator {
   private contextAgent = new ContextAgent();
@@ -19,43 +25,72 @@ export class Orchestrator {
       `[Orchestrator] Processing message for user ${context.userId}`
     );
 
-    // 1. Build Context
-    const contextResult = await this.contextAgent.buildContext(context);
+    // If senderId is in metadata, use it. Otherwise fallback to userId (might not work for Linq if it expects phone)
+    const recipientId = context.metadata?.senderId || context.userId;
+    const runId = context.metadata?.runId;
 
-    if (!contextResult.success || !contextResult.data) {
-      await this.messagingProvider.sendMessage({
-        recipientId: context.userId,
-        text: "I'm having trouble accessing my memory right now.",
+    try {
+      // 1. Build Context
+      const contextResult = await this.contextAgent.buildContext(context);
+
+      if (!contextResult.success || !contextResult.data) {
+        await this.messagingProvider.sendMessage({
+          recipientId,
+          text: "I'm having trouble accessing my memory right now.",
+        });
+        await this.completeRun(runId, "failed", null, "ContextAgent failed");
+        return;
+      }
+
+      // 2. Generate Response
+      const draftResult = await this.draftAgent.generateDraft({
+        intent: "reply",
+        userQuery: context.input,
+        context: contextResult.data
       });
 
-      return;
-    }
+      if (!draftResult.success || !draftResult.data) {
+        await this.messagingProvider.sendMessage({
+          recipientId,
+          text: "I couldn't generate a response right now.",
+        });
+        await this.completeRun(runId, "failed", null, "DraftAgent failed");
+        return;
+      }
 
-    // 2. Generate Response
-    // DraftAgent receives the context + retrieved memory summary.
-    const draftResult = await this.draftAgent.generateDraft({
-      intent: "reply",
-      userQuery: context.input,
-      context: contextResult.data
-    });
-
-    if (!draftResult.success || !draftResult.data) {
-      await this.messagingProvider.sendMessage({
-        recipientId: context.userId,
-        text: "I couldn't generate a response right now.",
+      // 3. Send response through Linq
+      const success = await this.messagingProvider.sendMessage({
+        recipientId,
+        text: draftResult.data.draft,
       });
 
-      return;
+      if (!success) {
+        await this.completeRun(runId, "failed", null, "LinqProvider failed to send message");
+        return;
+      }
+
+      console.log(
+        `[Orchestrator] Finished processing message for user ${context.userId}`
+      );
+      
+      await this.completeRun(runId, "completed", draftResult.data, null);
+    } catch (error: any) {
+      console.error("[Orchestrator] Unexpected error:", error);
+      await this.messagingProvider.sendMessage({
+        recipientId,
+        text: "An unexpected error occurred while processing your message.",
+      });
+      await this.completeRun(runId, "failed", null, error.message);
     }
-
-    // 3. Send response through Linq
-    await this.messagingProvider.sendMessage({
-      recipientId: context.userId,
-      text: draftResult.data.draft,
-    });
-
-    console.log(
-      `[Orchestrator] Finished processing message for user ${context.userId}`
-    );
+  }
+  
+  private async completeRun(runId: string | undefined, status: string, output: any, errorStr: string | null) {
+    if (!runId) return;
+    await supabase.from("agent_runs").update({
+      status,
+      output,
+      error: errorStr,
+      finished_at: new Date().toISOString()
+    }).eq("id", runId);
   }
 }

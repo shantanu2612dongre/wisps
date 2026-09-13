@@ -29,7 +29,7 @@ describe("GmailSyncService", () => {
       setCredentials: vi.fn(),
     };
 
-    (google.auth.OAuth2 as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockOAuth2Client);
+    (google.auth.OAuth2 as unknown as ReturnType<typeof vi.fn>).mockImplementation(function() { return mockOAuth2Client; });
   });
 
   it("should fail gracefully if integration is not found", async () => {

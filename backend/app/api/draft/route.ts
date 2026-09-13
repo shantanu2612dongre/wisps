@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 import { DraftAgent, DraftAgentInput } from '../../../agents/DraftAgent';
+import { authenticate } from '../../../lib/authenticate';
 
 const draftAgent = new DraftAgent();
 
 export async function POST(req: Request) {
   try {
+    let authUser;
+    try {
+      authUser = authenticate(req);
+    } catch (e: any) {
+      return NextResponse.json({ error: e.message }, { status: 401 });
+    }
+
     const body: DraftAgentInput = await req.json();
 
     if (!body.intent || !body.userQuery || !body.context) {

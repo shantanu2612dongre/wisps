@@ -1,34 +1,102 @@
 import { NextResponse } from "next/server";
 import { Orchestrator } from "../../../../agents/Orchestrator";
 import { LinqProvider } from "../../../../messaging/linq/LinqProvider";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-linq-signature");
     const linq = new LinqProvider();
+
+    // 1. Validate Signature
+    if (!linq.verifyWebhookSignature(rawBody, signature)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const payload = JSON.parse(rawBody);
     
-    // Parse the payload into standard format
+    // 2. Parse payload
     const incomingMessage = linq.parseIncomingPayload(payload);
     
-    // In a real application, you would map `incomingMessage.senderId` (e.g., a phone number)
-    // to a `userId` and `workspaceId` in your `users` and `workspace_users` tables.
-    const mockWorkspaceId = "ws_123"; 
-    const mockUserId = incomingMessage.senderId;
+    // 3. User Identification
+    const { data: userResult, error: userError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("phone", incomingMessage.senderId)
+      .single();
+
+    let user = userResult;
+
+    if (userError || !user) {
+      console.log(`[Linq Webhook] Unknown sender phone: ${incomingMessage.senderId}. Creating new user.`);
+      
+      const { data: newUser, error: insertError } = await supabase
+        .from("users")
+        .insert({ 
+          phone: incomingMessage.senderId,
+          email: `${incomingMessage.senderId.replace('+', '')}@wisps.temp` // Temporary email to satisfy NOT NULL constraint
+        })
+        .select("id")
+        .single();
+
+      if (insertError) {
+        console.error("[Linq Webhook] Failed to create user:", insertError);
+        return NextResponse.json({ error: "Failed to register new user" }, { status: 500 });
+      }
+      
+      user = newUser;
+    }
+
+    // 4. Idempotency Check (Check agent_runs for existing run for this message ID)
+    const { data: existingRun } = await supabase
+      .from("agent_runs")
+      .select("id")
+      .eq("user_id", user.id)
+      .contains("input", { messageId: incomingMessage.id })
+      .maybeSingle();
+
+    if (existingRun) {
+      console.log(`[Linq Webhook] Duplicate message ${incomingMessage.id} detected. Skipping.`);
+      return NextResponse.json({ success: true, duplicate: true });
+    }
+
+    // Insert an initial agent_run record to lock this message ID
+    const { data: newRun, error: runError } = await supabase
+      .from("agent_runs")
+      .insert({
+        user_id: user.id,
+        agent_name: "Orchestrator",
+        status: "processing",
+        input: { messageId: incomingMessage.id, text: incomingMessage.text }
+      })
+      .select()
+      .single();
+
+    if (runError) {
+      console.error("[Linq Webhook] Failed to lock agent run for idempotency:", runError);
+      // We can choose to proceed or fail. Proceeding might risk duplicates if race condition.
+    }
     
     const orchestrator = new Orchestrator();
+    const mockWorkspaceId = ""; // No workspaces in current DB schema
     
-    // Process the message asynchronously to not block the webhook response
-    // (In production this might be pushed to a queue or Trigger.dev job)
+    // 5. Dispatch
     orchestrator.handleIncomingMessage({
       workspaceId: mockWorkspaceId,
-      userId: mockUserId,
+      userId: user.id,
       input: incomingMessage.text,
-      metadata: { messageId: incomingMessage.id, timestamp: incomingMessage.timestamp }
+      metadata: { messageId: incomingMessage.id, timestamp: incomingMessage.timestamp, runId: newRun?.id, senderId: incomingMessage.senderId }
     }).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Linq webhook error:", error);
+    console.error("[Linq Webhook] Error processing request:", error);
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 }
