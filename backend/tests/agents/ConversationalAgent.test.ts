@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ConversationalAgent } from '../../agents/ConversationalAgent';
+import OpenAI from 'openai';
 
 // Mock the OpenAI module
 vi.mock('openai', () => {
@@ -83,6 +84,13 @@ describe('ConversationalAgent', () => {
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
     expect(result.data?.reply).toContain("hey! what's up?");
+
+    const openai = new OpenAI();
+    expect(openai.chat.completions.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        max_tokens: 300
+      })
+    );
   });
 
   it('should generate an identity reply for "who are you"', async () => {

@@ -51,7 +51,8 @@ Return JSON ONLY matching this structure:
             content: input.userQuery
           }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        max_tokens: 300
       });
 
       let responseContent = completion.choices[0].message.content || "{}";
