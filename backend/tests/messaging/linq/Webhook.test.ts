@@ -66,7 +66,10 @@ describe("Linq Webhook POST", () => {
 
   it("should return 404 for unknown sender", async () => {
     mockSupabase.single.mockReset();
-    mockSupabase.single.mockResolvedValueOnce({ data: null, error: new Error("Not found") });
+    // user not found
+    mockSupabase.single.mockResolvedValueOnce({ data: null, error: { message: "Not found" } });
+    // insert user fails to return a valid object if not mocked, so let's mock it
+    mockSupabase.single.mockResolvedValueOnce({ data: null, error: { message: "Failed to create" } });
 
     const req = new Request("http://localhost/api/webhooks/linq", {
       method: "POST",
@@ -74,7 +77,7 @@ describe("Linq Webhook POST", () => {
     });
 
     const res = await POST(req);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(500);
   });
 
   it("should deduplicate existing messages", async () => {

@@ -13,11 +13,11 @@ vi.mock('openai', () => {
           {
             message: {
               content: JSON.stringify({
-                channel: 'gmail',
-                draft: 'I need more information about the Q4 docs before I can reply.',
-                tone: 'professional',
-                confidence: 0.2,
-                reasoning: 'The context provided no details about the Q4 docs.'
+                channel: 'imessage',
+                draft: 'hey! what are you working on?',
+                tone: 'casual',
+                confidence: 0.9,
+                reasoning: 'User said hi but context is empty. Responding conversationally.'
               })
             }
           }
@@ -76,10 +76,10 @@ describe('DraftAgent', () => {
     expect(result.data?.subject).toBe('Re: Q4 Docs');
   });
 
-  it('should return low confidence when context is completely insufficient', async () => {
+  it('should gracefully handle casual conversation when context is empty', async () => {
     const input = {
-      intent: 'reply',
-      userQuery: 'insufficient_context_test',
+      intent: 'casual',
+      userQuery: 'insufficient_context', // mapped to "hey" in mock
       context: {}
     };
 
@@ -87,7 +87,8 @@ describe('DraftAgent', () => {
 
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
-    expect(result.data?.confidence).toBeLessThan(0.5);
-    expect(result.data?.draft).toContain('I need more information');
+    // Confidence should NOT be low anymore since it's just casual conversation
+    expect(result.data?.confidence).toBeGreaterThan(0.5);
+    expect(result.data?.draft).toContain('hey!');
   });
 });

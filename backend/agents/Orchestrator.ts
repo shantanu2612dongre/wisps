@@ -4,6 +4,12 @@ import { DraftAgent } from "./DraftAgent";
 import { ActionAgent } from "./ActionAgent";
 import { LinqProvider } from "../messaging/linq/LinqProvider";
 import { createClient } from "@supabase/supabase-js";
+import OpenAI from "openai";
+
+const openai = new OpenAI({ 
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build" 
+});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
@@ -30,23 +36,32 @@ export class Orchestrator {
     const runId = context.metadata?.runId;
 
     try {
-      // 1. Build Context
-      const contextResult = await this.contextAgent.buildContext(context);
+      const intent = await this.analyzeIntent(context.input);
+      console.log(`[Orchestrator] Classified intent: ${intent}`);
 
-      if (!contextResult.success || !contextResult.data) {
-        await this.messagingProvider.sendMessage({
-          recipientId,
-          text: "I'm having trouble accessing my memory right now.",
-        });
-        await this.completeRun(runId, "failed", null, "ContextAgent failed");
-        return;
+      let contextData = null;
+
+      // 1. Build Context if needed
+      if (intent === "context" || intent === "action") {
+        const contextResult = await this.contextAgent.buildContext(context);
+        if (!contextResult.success || !contextResult.data) {
+          console.error("[Orchestrator] ContextAgent failed, proceeding to DraftAgent without memory.", contextResult.error);
+          // We DO NOT hard-fail here. We proceed so DraftAgent can reply gracefully.
+        } else {
+          contextData = contextResult.data;
+        }
+      }
+
+      if (intent === "action") {
+         // Placeholder for future action routing.
+         // Action requests still route to DraftAgent to generate a conversational response right now.
       }
 
       // 2. Generate Response
       const draftResult = await this.draftAgent.generateDraft({
-        intent: "reply",
+        intent: intent,
         userQuery: context.input,
-        context: contextResult.data
+        context: contextData
       });
 
       if (!draftResult.success || !draftResult.data) {
@@ -81,6 +96,34 @@ export class Orchestrator {
         text: "An unexpected error occurred while processing your message.",
       });
       await this.completeRun(runId, "failed", null, error.message);
+    }
+  }
+
+  private async analyzeIntent(text: string): Promise<"casual" | "context" | "action"> {
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "openai/gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Classify the user's message intent into exactly one of three categories:
+1. "casual": Simple greetings (hey, hi, what's up), identity questions (who are you, what can you do), or very generic short chatter that does not require retrieving the user's specific tasks, memories, or relationships.
+2. "context": Questions or statements that require looking up past information, tasks, people, or context (e.g. "what do I need to know about Ken", "what did we talk about last week", "what's on my plate").
+3. "action": Explicit requests to DO something (e.g. "tell Ken I'll send it tomorrow", "draft an email", "create a task").
+
+Return ONLY the single word: casual, context, or action.`
+          },
+          { role: "user", content: text }
+        ],
+        temperature: 0.0
+      });
+      const intentStr = completion.choices[0].message.content?.trim().toLowerCase() || "context";
+      if (intentStr.includes("casual")) return "casual";
+      if (intentStr.includes("action")) return "action";
+      return "context";
+    } catch (e) {
+      console.error("[Orchestrator] Intent analysis failed, defaulting to context", e);
+      return "context";
     }
   }
   
