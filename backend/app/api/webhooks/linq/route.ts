@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         agent_name: "Orchestrator",
-        status: "processing",
+        status: "running",
         input: { messageId: incomingMessage.id, text: incomingMessage.text }
       })
       .select()
