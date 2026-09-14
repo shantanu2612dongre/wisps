@@ -1,7 +1,10 @@
 import { AgentContext, AgentResult, MemoryFact } from "./types";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" });
+const openai = new OpenAI({ 
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build" 
+});
 
 export class MemoryAgent {
   /**
@@ -11,7 +14,7 @@ export class MemoryAgent {
     try {
       // Step 1: Is this meaningful?
       const checkCompletion = await openai.chat.completions.create({
-        model: "gpt-4o-mini", // Use faster/cheaper model for binary classification
+        model: "openai/gpt-4o-mini", // Use faster/cheaper model for binary classification
         messages: [
           {
             role: "system",
@@ -32,7 +35,7 @@ export class MemoryAgent {
 
       // Step 2: Extract Memory
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
         messages: [
           {
             role: "system",

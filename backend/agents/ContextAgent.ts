@@ -2,7 +2,10 @@ import { AgentContext, AgentResult } from "./types";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" });
+const openai = new OpenAI({ 
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build" 
+});
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
   process.env.SUPABASE_SERVICE_ROLE_KEY || "dummy-key"
@@ -28,7 +31,7 @@ export class ContextAgent {
 
       // 1. Generate embedding for the user's natural language query
       const embeddingResponse = await openai.embeddings.create({
-        model: "text-embedding-3-small", // or text-embedding-ada-002
+        model: "openai/text-embedding-3-small", // or text-embedding-ada-002
         input: context.input,
       });
       const queryEmbedding = embeddingResponse.data[0].embedding;
@@ -82,7 +85,7 @@ export class ContextAgent {
 
       // 5. Generate concise natural language summary using ONLY the context packet
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
         messages: [
           {
             role: "system",

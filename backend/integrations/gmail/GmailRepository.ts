@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" });
+const openai = new OpenAI({ 
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build" 
+});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || "https://dummy.supabase.co",
@@ -71,7 +74,7 @@ export class GmailRepository {
       try {
         const textToEmbed = JSON.stringify(content);
         const embeddingResponse = await openai.embeddings.create({
-          model: "text-embedding-3-small",
+          model: "openai/text-embedding-3-small",
           input: textToEmbed,
         });
         

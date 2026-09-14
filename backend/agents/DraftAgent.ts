@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-build" });
+const openai = new OpenAI({ 
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build" 
+});
 
 export interface DraftAgentInput {
   intent: string;
@@ -24,7 +27,7 @@ export class DraftAgent {
   async generateDraft(input: DraftAgentInput): Promise<{ success: boolean; data?: DraftAgentOutput; error?: string }> {
     try {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "openai/gpt-4o",
         messages: [
           {
             role: "system",

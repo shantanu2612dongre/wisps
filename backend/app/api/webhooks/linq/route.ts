@@ -87,12 +87,12 @@ export async function POST(request: Request) {
     const mockWorkspaceId = ""; // No workspaces in current DB schema
     
     // 5. Dispatch
-    orchestrator.handleIncomingMessage({
+    await orchestrator.handleIncomingMessage({
       workspaceId: mockWorkspaceId,
       userId: user.id,
       input: incomingMessage.text,
       metadata: { messageId: incomingMessage.id, timestamp: incomingMessage.timestamp, runId: newRun?.id, senderId: incomingMessage.senderId }
-    }).catch(console.error);
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
