@@ -69,16 +69,23 @@ export class LinqProvider implements MessagingProvider {
   }
 
   parseIncomingPayload(payload: any): IncomingMessage {
-    // Assuming a standard webhook payload from Linq
-    if (!payload || !payload.id || !payload.senderId || !payload.text) {
+    const data = payload?.data;
+    
+    // Assuming a standard webhook payload from Linq v3
+    if (!data || !data.id || !data.sender_handle?.handle || !data.parts || !Array.isArray(data.parts)) {
       throw new Error("Invalid Linq payload format");
     }
 
+    const textPart = data.parts.find((p: any) => p.type === "text" && p.value);
+    if (!textPart) {
+      throw new Error("Invalid Linq payload format: Missing text part");
+    }
+
     return {
-      id: payload.id,
-      senderId: payload.senderId,
-      text: payload.text,
-      timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+      id: data.id,
+      senderId: data.sender_handle.handle,
+      text: textPart.value,
+      timestamp: data.sent_at ? new Date(data.sent_at) : new Date(),
     };
   }
 }
