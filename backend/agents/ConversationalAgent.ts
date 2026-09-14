@@ -1,9 +1,9 @@
 import OpenAI from "openai";
 import { AgentResult } from "./types";
 
-const openai = new OpenAI({ 
+const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build" 
+  apiKey: process.env.OPENROUTER_API_KEY || ""
 });
 
 export interface ConversationalAgentInput {
@@ -46,9 +46,9 @@ Return JSON ONLY matching this structure:
   "reply": "your super casual, lowercase text message reply here"
 }`
           },
-          { 
-            role: "user", 
-            content: input.userQuery 
+          {
+            role: "user",
+            content: input.userQuery
           }
         ],
         response_format: { type: "json_object" }
