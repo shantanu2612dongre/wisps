@@ -3,7 +3,7 @@ import { AgentResult } from "./types";
 
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || ""
+  apiKey: process.env.OPENROUTER_API_KEY || "dummy-key-for-build"
 });
 
 export interface ConversationalAgentInput {
@@ -54,7 +54,11 @@ Return JSON ONLY matching this structure:
         response_format: { type: "json_object" }
       });
 
-      const responseContent = completion.choices[0].message.content || "{}";
+      let responseContent = completion.choices[0].message.content || "{}";
+      
+      // Clean up potential markdown formatting from OpenRouter models
+      responseContent = responseContent.replace(/```json/gi, "").replace(/```/g, "").trim();
+      
       const result: ConversationalAgentOutput = JSON.parse(responseContent);
 
       return { success: true, data: result };

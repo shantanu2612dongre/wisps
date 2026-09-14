@@ -58,7 +58,11 @@ RULES:
         response_format: { type: "json_object" }
       });
 
-      const responseContent = completion.choices[0].message.content || "{}";
+      let responseContent = completion.choices[0].message.content || "{}";
+      
+      // Clean up potential markdown formatting from OpenRouter models
+      responseContent = responseContent.replace(/```json/gi, "").replace(/```/g, "").trim();
+      
       const result: DraftAgentOutput = JSON.parse(responseContent);
 
       return { success: true, data: result };
