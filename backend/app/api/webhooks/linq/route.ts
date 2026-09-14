@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     }
 
     const payload = JSON.parse(rawBody);
+    console.log("[Linq Webhook] Raw payload received:", JSON.stringify(payload, null, 2));
     
     // 2. Parse payload
     const incomingMessage = linq.parseIncomingPayload(payload);
