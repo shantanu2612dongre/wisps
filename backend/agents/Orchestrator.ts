@@ -2,6 +2,7 @@ import { AgentContext } from "./types";
 import { ContextAgent } from "./ContextAgent";
 import { DraftAgent } from "./DraftAgent";
 import { ActionAgent } from "./ActionAgent";
+import { ConversationalAgent } from "./ConversationalAgent";
 import { LinqProvider } from "../messaging/linq/LinqProvider";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
@@ -20,6 +21,7 @@ export class Orchestrator {
   private contextAgent = new ContextAgent();
   private draftAgent = new DraftAgent();
   private actionAgent = new ActionAgent();
+  private conversationalAgent = new ConversationalAgent();
   private messagingProvider = new LinqProvider();
 
   /**
@@ -38,6 +40,25 @@ export class Orchestrator {
     try {
       const intent = await this.analyzeIntent(context.input);
       console.log(`[Orchestrator] Classified intent: ${intent}`);
+
+      if (intent === "casual") {
+        const chatResult = await this.conversationalAgent.chat({ userQuery: context.input });
+        if (!chatResult.success || !chatResult.data) {
+          console.error("[Orchestrator] ConversationalAgent failed", chatResult.error);
+          await this.completeRun(runId, "failed", null, "ConversationalAgent failed");
+          return;
+        }
+        const success = await this.messagingProvider.sendMessage({
+          recipientId,
+          text: chatResult.data.reply,
+        });
+        if (!success) {
+          await this.completeRun(runId, "failed", null, "LinqProvider failed to send message");
+          return;
+        }
+        await this.completeRun(runId, "completed", chatResult.data, null);
+        return;
+      }
 
       let contextData = null;
 
