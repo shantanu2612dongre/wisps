@@ -61,9 +61,56 @@ export class LinqProvider implements MessagingProvider {
         console.error("[LinqProvider] failed to send message. Status:", response.status);
         return false;
       }
+
+      // Try to extract chatId if returned by the Linq API to trigger contact card sharing
+      try {
+        const responseData = await response.json();
+        const chatId = responseData?.chat?.id || responseData?.id;
+        
+        if (chatId) {
+          // Asynchronously share the contact card without blocking the message flow
+          this.shareContactCard(chatId).catch(err => {
+            console.error(`[LinqProvider] Non-blocking failure when sharing contact card for chat ${chatId}:`, err);
+          });
+        }
+      } catch (e) {
+        // Ignore JSON parse errors here if Linq doesn't return JSON on success
+      }
+
       return true;
     } catch (error) {
       console.error("[LinqProvider] error sending message:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Shares the configured contact card into the specified chat so the user receives the native iMessage avatar.
+   */
+  private async shareContactCard(chatId: string): Promise<boolean> {
+    try {
+      const url = `${this.endpoint.replace(/\/$/, '').replace('/v1/messages', '')}/api/partner/v3/chats/${chatId}/share_contact_card`;
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        }
+      });
+
+      if (!response.ok) {
+        // 409 usually means the card was already shared recently or is active, which is fine to ignore.
+        if (response.status !== 409) {
+          console.warn(`[LinqProvider] Failed to share contact card for chat ${chatId}. Status: ${response.status}`);
+        }
+        return false;
+      }
+
+      console.log(`[LinqProvider] Successfully shared contact card for chat ${chatId}`);
+      return true;
+    } catch (error) {
+      console.error(`[LinqProvider] Exception while sharing contact card for chat ${chatId}:`, error);
       return false;
     }
   }
