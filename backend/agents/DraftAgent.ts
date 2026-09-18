@@ -55,7 +55,8 @@ RULES:
             content: `Intent: ${input.intent}\nUser Query: ${input.userQuery}\nContext Packet: ${JSON.stringify(input.context, null, 2)}`
           }
         ],
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        max_tokens: 500
       });
 
       let responseContent = completion.choices[0].message.content || "{}";

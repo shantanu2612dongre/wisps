@@ -136,7 +136,8 @@ Return ONLY the single word: casual, context, or action.`
           },
           { role: "user", content: text }
         ],
-        temperature: 0.0
+        temperature: 0.0,
+        max_tokens: 50
       });
       const intentStr = completion.choices[0].message.content?.trim().toLowerCase() || "context";
       if (intentStr.includes("casual")) return "casual";

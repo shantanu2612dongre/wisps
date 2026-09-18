@@ -95,7 +95,8 @@ export class ContextAgent {
             role: "user", 
             content: `User Query: ${context.input}\nContext Packet: ${JSON.stringify(contextPacket, null, 2)}` 
           }
-        ]
+        ],
+        max_tokens: 500
       });
 
       const summary = completion.choices[0].message.content;
